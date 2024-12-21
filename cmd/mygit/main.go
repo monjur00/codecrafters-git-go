@@ -80,11 +80,12 @@ func (g GitObject) Content() string {
 	return string(g[8:])
 }
 
-func (g GitObject) Hash() string {
+func (g GitObject) Hash() (string, []byte) {
 	h := sha1.New()
 	h.Write(g)
 	// return base64.StdEncoding.EncodeToString(h.Sum(nil))
-	return fmt.Sprintf("%x", h.Sum(nil))
+	b := h.Sum(nil)
+	return fmt.Sprintf("%x", b), b
 }
 
 func catFile(t, obj string) {
@@ -139,7 +140,7 @@ func hashObject(path string) {
 	content = append(content, 0)
 	content = append(content, b...)
 
-	h := content.Hash()
+	h, _ := content.Hash()
 	dir := h[0:2]
 	file := h[2:]
 
@@ -193,12 +194,12 @@ func lsTree(sha string) {
 
 func writeTree() {
 	_, h := writeTreeRec(".", true)
-	fmt.Printf("%s", h)
+	fmt.Printf("%x", h)
 }
 
 // writeTreeRec recursively create git object
 // returns object type and hash
-func writeTreeRec(path string, isDir bool) (string, string) {
+func writeTreeRec(path string, isDir bool) (string, []byte) {
 	if isDir {
 		// this is a dir, we need to generate
 		dirEntries, err := os.ReadDir(path)
@@ -222,13 +223,14 @@ func writeTreeRec(path string, isDir bool) (string, string) {
 			} else {
 				content = fmt.Sprintf("100644 %s\u0000", d.Name())
 			}
-			cHash := append([]byte(content), []byte(h)...)
+			cHash := append([]byte(content), h...)
 			contents = append(contents, string(cHash))
 		}
 
 		cc := strings.Join(contents, "")
 		g := newGitObj("tree", []byte(cc))
-		return "tree", g.HashObj()
+		_, b := g.HashObj()
+		return "tree", b
 	}
 
 	b, err := os.ReadFile(path)
@@ -239,7 +241,8 @@ func writeTreeRec(path string, isDir bool) (string, string) {
 
 	// generate hash object of the file and return the hash
 	g := newGitObj("blob", b)
-	return "blob", g.HashObj()
+	_, bb := g.HashObj()
+	return "blob", bb
 }
 
 // newGitObj creates a new git object
@@ -266,8 +269,8 @@ func newGitObj(t string, body []byte) GitObject {
 }
 
 // HashObj writes the obj and return hash
-func (g GitObject) HashObj() string {
-	h := g.Hash()
+func (g GitObject) HashObj() (string, []byte) {
+	h, b := g.Hash()
 	dir := h[0:2]
 	file := h[2:]
 
@@ -287,5 +290,5 @@ func (g GitObject) HashObj() string {
 		os.Exit(1)
 	}
 
-	return h
+	return h, b
 }
