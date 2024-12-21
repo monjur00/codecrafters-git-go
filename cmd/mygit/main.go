@@ -226,7 +226,7 @@ func writeTreeRec(path string, isDir bool) (string, string) {
 			contents = append(contents, string(cHash))
 		}
 
-		cc := strings.Join(contents, "\n")
+		cc := strings.Join(contents, "")
 		g := newGitObj("tree", []byte(cc))
 		return "tree", g.HashObj()
 	}
