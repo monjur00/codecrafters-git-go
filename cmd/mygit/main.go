@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"strings"
 )
 
 // Usage: your_program.sh <command> <arg1> <arg2> ...
@@ -56,6 +57,8 @@ func main() {
 			os.Exit(1)
 		}
 		lsTree(os.Args[3])
+	case "write-tree":
+		writeTree()
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command %s\n", command)
 		os.Exit(1)
@@ -185,4 +188,98 @@ func lsTree(sha string) {
 		d := bytes.Split(s, []byte(" "))[1]
 		fmt.Printf("%s\n", d)
 	}
+}
+
+func writeTree() {
+	_, h := writeTreeRec(".", true)
+	fmt.Printf("%s", h)
+}
+
+// writeTreeRec recursively create git object
+// returns object type and hash
+func writeTreeRec(path string, isDir bool) (string, string) {
+	if isDir {
+		// this is a dir, we need to generate
+		dirEntries, err := os.ReadDir(path)
+		if err != nil {
+			fmt.Println("Failed to read dir", err)
+			os.Exit(1)
+		}
+		var contents []string
+		for _, d := range dirEntries {
+			if strings.Contains(d.Name(), ".git") {
+				// ignore .git dir
+				continue
+			}
+
+			t, h := writeTreeRec(path+"/"+d.Name(), d.IsDir())
+			var content string
+			if t == "tree" {
+				content = fmt.Sprintf("40000 %s\u0000", d.Name())
+			} else {
+				content = fmt.Sprintf("100644 %s\u0000", d.Name())
+			}
+			cHash := append([]byte(content), []byte(h)...)
+			contents = append(contents, string(cHash))
+		}
+
+		cc := strings.Join(contents, "\n")
+		g := newGitObj("tree", []byte(cc))
+		return "tree", g.HashObj()
+	}
+
+	b, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Println("Failed to read file", err)
+		os.Exit(1)
+	}
+
+	// generate hash object of the file and return the hash
+	g := newGitObj("blob", b)
+	return "blob", g.HashObj()
+}
+
+// newGitObj creates a new git object
+// t is type of object like blob, tree
+func newGitObj(t string, body []byte) GitObject {
+	var content GitObject
+	switch t {
+	case "tree":
+		content = append(content, []byte("tree ")...)
+		content = append(content, []byte(strconv.Itoa(len(body)))...)
+		content = append(content, []byte("\u0000")...)
+		content = append(content, []byte("\n")...)
+		content = append(content, body...)
+	case "blob":
+		content = append(content, []byte("blob ")...)
+		content = append(content, []byte(strconv.Itoa(len(body)))...)
+		content = append(content, []byte("\u0000")...)
+		content = append(content, body...)
+	}
+	return content
+}
+
+// HashObj writes the obj and return hash
+func (g GitObject) HashObj() string {
+	h := g.Hash()
+	dir := h[0:2]
+	file := h[2:]
+
+	var buffer bytes.Buffer
+	z := zlib.NewWriter(&buffer)
+	z.Write([]byte(g))
+	z.Close()
+
+	err := os.MkdirAll(fmt.Sprintf(".git/objects/%s/", dir), os.ModePerm)
+	if err != nil {
+		fmt.Println("failed to write file", err)
+		os.Exit(1)
+	}
+
+	if err := os.WriteFile(fmt.Sprintf(".git/objects/%s/%s", dir, file), buffer.Bytes(), 0644); err != nil {
+		fmt.Println("failed to write file", err)
+		os.Exit(1)
+	}
+
+	return h
 }
