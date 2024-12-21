@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -206,6 +207,8 @@ func writeTreeRec(path string, isDir bool) (string, string) {
 			os.Exit(1)
 		}
 		var contents []string
+
+		slices.SortFunc(dirEntries, func(i, j os.DirEntry) int { return strings.Compare(i.Name(), j.Name()) })
 		for _, d := range dirEntries {
 			if strings.Contains(d.Name(), ".git") {
 				// ignore .git dir
@@ -242,13 +245,16 @@ func writeTreeRec(path string, isDir bool) (string, string) {
 // newGitObj creates a new git object
 // t is type of object like blob, tree
 func newGitObj(t string, body []byte) GitObject {
+	// s := fmt.Sprintf("%s %d\u0000%s", t, len(body), string(body))
+	// return GitObject(s)
+
 	var content GitObject
 	switch t {
 	case "tree":
 		content = append(content, []byte("tree ")...)
 		content = append(content, []byte(strconv.Itoa(len(body)))...)
 		content = append(content, []byte("\u0000")...)
-		content = append(content, []byte("\n")...)
+		// content = append(content, []byte("\n")...)
 		content = append(content, body...)
 	case "blob":
 		content = append(content, []byte("blob ")...)
