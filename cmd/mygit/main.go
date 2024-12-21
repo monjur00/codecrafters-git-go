@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"compress/zlib"
+	"crypto/sha1"
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 )
 
 // Usage: your_program.sh <command> <arg1> <arg2> ...
@@ -41,6 +44,12 @@ func main() {
 			os.Exit(1)
 		}
 		catFile(os.Args[2], os.Args[3])
+	case "hash-object":
+		if len(os.Args) < 4 {
+			fmt.Fprintf(os.Stderr, "usage: mygit <command> [<args>...]\n")
+			os.Exit(1)
+		}
+		hashObject(os.Args[3])
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command %s\n", command)
 		os.Exit(1)
@@ -61,6 +70,13 @@ func (g GitObject) Content() string {
 	return string(g[8:])
 }
 
+func (g GitObject) Hash() string {
+	h := sha1.New()
+	h.Write(g)
+	// return base64.StdEncoding.EncodeToString(h.Sum(nil))
+	return fmt.Sprintf("%x", h.Sum(nil))
+}
+
 func catFile(t, obj string) {
 	dir := obj[0:2]
 	file := obj[2:]
@@ -70,12 +86,14 @@ func catFile(t, obj string) {
 		fmt.Printf("failed to open file %v\n", err)
 		os.Exit(1)
 	}
+	defer f.Close()
 
 	r, err := zlib.NewReader(f)
 	if err != nil {
 		fmt.Printf("failed to open file %v\n", err)
 		os.Exit(1)
 	}
+	defer r.Close()
 
 	b, err := io.ReadAll(r)
 	if err != nil {
@@ -96,4 +114,34 @@ func catFile(t, obj string) {
 		fmt.Printf("Unknown argument %s", t)
 		os.Exit(1)
 	}
+}
+
+func hashObject(path string) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Println("Failed to read file", err)
+		os.Exit(1)
+	}
+
+	var content GitObject
+	content = append(content, []byte("blob ")...)
+	content = append(content, []byte(strconv.Itoa(len(b)))...)
+	content = append(content, 0)
+	content = append(content, b...)
+
+	h := content.Hash()
+	dir := h[0:2]
+	file := h[2:]
+
+	os.MkdirAll(fmt.Sprintf(".git/objects/%s/", dir), os.ModePerm)
+	var buffer bytes.Buffer
+	z := zlib.NewWriter(&buffer)
+	z.Write(content)
+	z.Close()
+
+	if err := os.WriteFile(fmt.Sprintf(".git/objects/%s/%s", dir, file), buffer.Bytes(), 0644); err != nil {
+		fmt.Println("failed to write file", err)
+		os.Exit(1)
+	}
+	fmt.Printf("%s", h)
 }
