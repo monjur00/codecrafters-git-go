@@ -50,6 +50,12 @@ func main() {
 			os.Exit(1)
 		}
 		hashObject(os.Args[3])
+	case "ls-tree":
+		if len(os.Args) < 4 {
+			fmt.Fprintf(os.Stderr, "usage: mygit <command> [<args>...]\n")
+			os.Exit(1)
+		}
+		lsTree(os.Args[3])
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command %s\n", command)
 		os.Exit(1)
@@ -144,4 +150,39 @@ func hashObject(path string) {
 		os.Exit(1)
 	}
 	fmt.Printf("%s", h)
+}
+
+func object(sha string) GitObject {
+	f, err := os.Open(fmt.Sprintf(".git/objects/%s/%s", sha[0:2], sha[2:]))
+	if err != nil {
+		fmt.Printf("failed to open file %v\n", err)
+		os.Exit(1)
+	}
+	defer f.Close()
+
+	r, err := zlib.NewReader(f)
+	if err != nil {
+		fmt.Printf("failed to open file %v\n", err)
+		os.Exit(1)
+	}
+	defer r.Close()
+
+	b, err := io.ReadAll(r)
+	if err != nil {
+		fmt.Printf("failed to open file %v\n", err)
+		os.Exit(1)
+	}
+
+	return GitObject(b)
+}
+
+func lsTree(sha string) {
+	g := object(sha)
+	split := bytes.Split([]byte(g.Content()), []byte("\x00"))
+	con := split[0 : len(split)-1]
+
+	for _, s := range con {
+		d := bytes.Split(s, []byte(" "))[1]
+		fmt.Printf("%s\n", d)
+	}
 }
