@@ -12,6 +12,26 @@ import (
 	"strings"
 )
 
+type GitObject []byte
+
+func (g GitObject) Type() string {
+	return string(g[0:4])
+}
+
+func (g GitObject) Size() string {
+	return string(g[5:7])
+}
+
+func (g GitObject) Content() string {
+	return string(g[8:])
+}
+
+func (g GitObject) Hash() []byte {
+	h := sha1.New()
+	h.Write(g)
+	return h.Sum(nil)
+}
+
 // Usage: your_program.sh <command> <arg1> <arg2> ...
 func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
@@ -66,28 +86,6 @@ func main() {
 	}
 }
 
-type GitObject []byte
-
-func (g GitObject) Type() string {
-	return string(g[0:4])
-}
-
-func (g GitObject) Size() string {
-	return string(g[5:7])
-}
-
-func (g GitObject) Content() string {
-	return string(g[8:])
-}
-
-func (g GitObject) Hash() (string, []byte) {
-	h := sha1.New()
-	h.Write(g)
-	// return base64.StdEncoding.EncodeToString(h.Sum(nil))
-	b := h.Sum(nil)
-	return fmt.Sprintf("%x", b), b
-}
-
 func catFile(t, obj string) {
 	dir := obj[0:2]
 	file := obj[2:]
@@ -140,7 +138,7 @@ func hashObject(path string) {
 	content = append(content, 0)
 	content = append(content, b...)
 
-	h, _ := content.Hash()
+	h := content.Hash()
 	dir := h[0:2]
 	file := h[2:]
 
@@ -154,7 +152,7 @@ func hashObject(path string) {
 		fmt.Println("failed to write file", err)
 		os.Exit(1)
 	}
-	fmt.Printf("%s", h)
+	fmt.Printf("%x", h)
 }
 
 func object(sha string) GitObject {
@@ -231,8 +229,8 @@ func writeTreeRec(path string, isDir bool) (string, []byte) {
 
 		cc := strings.Join(contents, "")
 		g := newGitObj("tree", []byte(cc))
-		_, b := g.HashObj()
-		return "tree", b
+		h := g.HashObj()
+		return "tree", h
 	}
 
 	b, err := os.ReadFile(path)
@@ -243,8 +241,8 @@ func writeTreeRec(path string, isDir bool) (string, []byte) {
 
 	// generate hash object of the file and return the hash
 	g := newGitObj("blob", b)
-	_, bb := g.HashObj()
-	return "blob", bb
+	h := g.HashObj()
+	return "blob", h
 }
 
 // newGitObj creates a new git object
@@ -271,8 +269,8 @@ func newGitObj(t string, body []byte) GitObject {
 }
 
 // HashObj writes the obj and return hash
-func (g GitObject) HashObj() (string, []byte) {
-	h, b := g.Hash()
+func (g GitObject) HashObj() []byte {
+	h := g.Hash()
 	dir := h[0:2]
 	file := h[2:]
 
@@ -292,5 +290,5 @@ func (g GitObject) HashObj() (string, []byte) {
 		os.Exit(1)
 	}
 
-	return h, b
+	return h
 }
