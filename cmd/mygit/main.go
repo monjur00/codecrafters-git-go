@@ -183,12 +183,14 @@ func object(sha string) GitObject {
 
 func lsTree(sha string) {
 	g := object(sha)
-	split := bytes.Split([]byte(g.Content()), []byte("\x00"))
-	con := split[0 : len(split)-1]
+	c := g.Content()
+	s := strings.Split(c, "\x00")
 
-	for _, s := range con {
-		d := bytes.Split(s, []byte(" "))[1]
-		fmt.Printf("%s\n", d)
+	for _, sss := range s {
+		sp := strings.Split(sss, " ")
+		if len(sp) > 1 {
+			fmt.Printf("%s\n", sp[1])
+		}
 	}
 }
 
