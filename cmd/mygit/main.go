@@ -138,7 +138,7 @@ func hashObject(path string) {
 	content = append(content, 0)
 	content = append(content, b...)
 
-	h := string(content.Hash())
+	h := fmt.Sprintf("%x", content.Hash())
 	dir := h[0:2]
 	file := h[2:]
 
