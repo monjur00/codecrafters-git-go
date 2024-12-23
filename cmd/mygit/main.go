@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var nullByte = []byte("\u0000")
@@ -128,6 +129,9 @@ func main() {
 		lsTree(os.Args[2], os.Args[3])
 	case "write-tree":
 		writeTree()
+	case "commit-tree":
+		//git commit-tree 5b825dc642cb6eb9a060e54bf8d69288fbee4904 -p 3b18e512dba79e4c8300dd08aeb37f8e728b8dad -m "Second commit"
+		commitTree(os.Args[2], os.Args[4], os.Args[6])
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command %s\n", command)
 		os.Exit(1)
@@ -342,4 +346,33 @@ func (g GitObject) HashObj() []byte {
 	}
 
 	return h
+}
+
+type CommitObject []byte
+
+func newCommitObject(treeSha, partentSha, msg string) CommitObject {
+	//commit {size}\0{content}
+	//tree {tree_sha}
+	//parent {parent1_sha}
+	// author {author_name} <{author_email}> {author_date_seconds} {author_date_timezone}
+	// committer {committer_name} <{committer_email}> {committer_date_seconds} {committer_date_timezone}
+	//
+	//{commit message}
+	content := fmt.Sprintf("tree %s\n", treeSha)
+	if len(partentSha) > 0 {
+		content += fmt.Sprintf("parent %s\n", partentSha)
+	}
+	content += fmt.Sprintf("author Scott Chacon <schacon@gmail.com> %d +0530\n", time.Now().Unix())
+	content += fmt.Sprintf("committer Scott Chacon <schacon@gmail.com> %d +0530\n", time.Now().Unix())
+	content += fmt.Sprintf("\n%s", msg)
+
+	commitObj := fmt.Sprintf("commit %d\u0000%s", len(content), content)
+	return CommitObject(commitObj)
+}
+
+func commitTree(treeSha, partentSha, msg string) {
+	c := newCommitObject(treeSha, partentSha, msg)
+	gitObj := GitObject(c)
+	h := gitObj.HashObj()
+	fmt.Printf("%x", h)
 }
