@@ -12,7 +12,12 @@ import (
 	"strings"
 )
 
+var nullByte = []byte("\u0000")
+var whiteSpaceByte = []byte("\u0020")
+
 type GitObject []byte
+type TreeContent []byte
+type TreeObject []byte
 
 func (g GitObject) Type() string {
 	return string(g[0:4])
@@ -30,6 +35,49 @@ func (g GitObject) Hash() []byte {
 	h := sha1.New()
 	h.Write(g)
 	return h.Sum(nil)
+}
+
+func (t TreeObject) Contents() []TreeContent {
+	// first null byte index
+	i := bytes.Index(t, nullByte)
+	c := t[i+1:]
+	var contents []TreeContent
+
+	for len(c) > 0 {
+		k := bytes.Index(c, nullByte)
+		newTreeCont := TreeContent(c[:k+21])
+		contents = append(contents, newTreeCont)
+		c = c[k+21:]
+	}
+
+	return contents
+}
+
+func (t TreeContent) TypeCode() string {
+	k := bytes.Index(t, nullByte)
+	typeCode := bytes.Split(t[:k], whiteSpaceByte)[0]
+	return string(typeCode)
+}
+func (t TreeContent) Type() string {
+	switch t.TypeCode() {
+	case "100644":
+		return "blob"
+	case "40000":
+		return "tree"
+	default:
+		return "unknown"
+	}
+}
+
+func (t TreeContent) Name() string {
+	k := bytes.Index(t, nullByte)
+	name := bytes.Split(t[:k], whiteSpaceByte)[1]
+	return string(name)
+}
+
+func (t TreeContent) Hash() []byte {
+	k := bytes.Index(t, nullByte)
+	return t[k+1:]
 }
 
 // Usage: your_program.sh <command> <arg1> <arg2> ...
@@ -77,7 +125,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "usage: mygit <command> [<args>...]\n")
 			os.Exit(1)
 		}
-		lsTree(os.Args[3])
+		lsTree(os.Args[2], os.Args[3])
 	case "write-tree":
 		writeTree()
 	default:
@@ -179,17 +227,19 @@ func object(sha string) GitObject {
 	return GitObject(b)
 }
 
-func lsTree(sha string) {
-	g := object(sha)
-	c := g.Content()
-	s := strings.Split(c, "\x00")
+func lsTree(arg, sha string) {
+	tree := TreeObject(object(sha))
+	var output []string
 
-	for _, sss := range s {
-		sp := strings.Split(sss, " ")
-		if len(sp) > 1 {
-			fmt.Printf("%s\n", sp[1])
+	for _, c := range tree.Contents() {
+		if arg == "--name-only" {
+			output = append(output, c.Name())
+		} else {
+			output = append(output, fmt.Sprintf("%s %s %x\t%s", c.TypeCode(), c.Type(), c.Hash(), c.Name()))
 		}
 	}
+
+	fmt.Println(strings.Join(output, "\n"))
 }
 
 func writeTree() {
