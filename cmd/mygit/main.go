@@ -271,8 +271,9 @@ func newGitObj(t string, body []byte) GitObject {
 // HashObj writes the obj and return hash
 func (g GitObject) HashObj() []byte {
 	h := g.Hash()
-	dir := h[0:2]
-	file := h[2:]
+	hHex := fmt.Sprintf("%x", h)
+	dir := hHex[0:2]
+	file := hHex[2:]
 
 	var buffer bytes.Buffer
 	z := zlib.NewWriter(&buffer)
