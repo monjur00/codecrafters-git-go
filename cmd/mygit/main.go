@@ -364,7 +364,7 @@ func newCommitObject(treeSha, partentSha, msg string) CommitObject {
 	}
 	content += fmt.Sprintf("author Scott Chacon <schacon@gmail.com> %d +0530\n", time.Now().Unix())
 	content += fmt.Sprintf("committer Scott Chacon <schacon@gmail.com> %d +0530\n", time.Now().Unix())
-	content += fmt.Sprintf("\n%s", msg)
+	content += fmt.Sprintf("\n%s\n", msg)
 
 	commitObj := fmt.Sprintf("commit %d\u0000%s", len(content), content)
 	return CommitObject(commitObj)
