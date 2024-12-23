@@ -138,7 +138,7 @@ func hashObject(path string) {
 	content = append(content, 0)
 	content = append(content, b...)
 
-	h := content.Hash()
+	h := string(content.Hash())
 	dir := h[0:2]
 	file := h[2:]
 
@@ -152,7 +152,7 @@ func hashObject(path string) {
 		fmt.Println("failed to write file", err)
 		os.Exit(1)
 	}
-	fmt.Printf("%x", h)
+	fmt.Printf("%s", h)
 }
 
 func object(sha string) GitObject {
